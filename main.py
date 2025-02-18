@@ -2,6 +2,7 @@
 from flask import Flask, render_template,request, redirect
 # Veri tabanı kitaplığını bağlama
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 #speech.py içerisinden speech fonksiyonu içeri aktardık.
 from speech import speechlan
 
@@ -47,37 +48,31 @@ class User(db.Model):
 # İçerik sayfasını çalıştırma
 @app.route('/', methods=['GET','POST'])
 def login():
-        error = ''
-        if request.method == 'POST':
-            form_login = request.form['email']
-            form_password = request.form['password']
-            
-            #Ödev #4. yetkilendirmeyi uygulamak
-            users_db = User.query.all()
-            for user in users_db:
-                if form_login == user.address and form_password == user.password:
-                    return redirect('/index')
-                else:
-                    error = "Hatalı Giriş Yaptınız!"
-            return render_template('login.html', error=error)
-        else:
-            return render_template('login.html')
-
+    error = ''
+    if request.method == 'POST':
+        form_login = request.form['email']
+        form_password = request.form['password']
+        
+        users_db = User.query.all()
+        for user in users_db:
+            if form_login == user.address and check_password_hash(user.password, form_password):  # Şifreleri karşılaştır
+                return redirect('/index')
+        error = "Hatalı Giriş Yaptınız!"
+    return render_template('login.html', error=error)
 
 
 @app.route('/reg', methods=['GET','POST'])
 def reg():
     if request.method == 'POST':
-        login= request.form['email']
+        login = request.form['email']
         password = request.form['password']
         
-        #Ödev #3 Kullanıcı verilerinin veri tabanına kaydedilmesini sağlayın
-        user = User(address = login, password = password)
+        hashed_password = generate_password_hash(password)  # Şifreyi hashle
+        user = User(address=login, password=hashed_password)
         db.session.add(user)
         db.session.commit()
 
         return redirect('/')
-    
     else:    
         return render_template('registration.html')
 
@@ -123,18 +118,20 @@ def recorden():
 @app.route('/form_create', methods=['GET','POST'])
 def form_create():
     if request.method == 'POST':
-        title =  request.form['title']
-        subtitle =  request.form['subtitle']
-        text =  request.form['text']
+        title = request.form.get('title')
+        subtitle = request.form.get('subtitle')
+        text = request.form.get('text')
 
-        # Veri tabanına gönderilecek bir nesne oluşturma
+        if not title or not subtitle or not text:  # Boş veri gönderimini engelle
+            return "Hatalı giriş, tüm alanlar doldurulmalıdır!", 400
+
         card = Card(title=title, subtitle=subtitle, text=text)
-
         db.session.add(card)
         db.session.commit()
         return redirect('/index')
     else:
         return render_template('create_card.html')
+
 
 
 
